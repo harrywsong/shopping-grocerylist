@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import Image from "next/image";
 import { ShoppingListItem } from "@/lib/types";
 
 interface SharedListClientProps {
@@ -29,6 +30,8 @@ function formatDate(iso: string): string {
 
 export default function SharedListClient({ items: initialItems, createdAt, expiresAt }: SharedListClientProps) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggle = (id: string) => {
     setChecked((prev) => {
@@ -37,6 +40,15 @@ export default function SharedListClient({ items: initialItems, createdAt, expir
       else next.add(id);
       return next;
     });
+  };
+
+  const startPress = (imageUrl: string | null) => {
+    if (!imageUrl) return;
+    pressTimer.current = setTimeout(() => setPreviewImage(imageUrl), 400);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
   };
 
   const groupedByStore: Record<string, ShoppingListItem[]> = {};
@@ -115,6 +127,9 @@ export default function SharedListClient({ items: initialItems, createdAt, expir
                       <button
                         type="button"
                         onClick={() => toggle(item.id)}
+                        onPointerDown={() => startPress(item.image_url)}
+                        onPointerUp={cancelPress}
+                        onPointerLeave={cancelPress}
                         className={`w-full px-6 py-4 flex items-center gap-4 text-left transition-colors duration-200 hover:bg-stone/30 ${isChecked ? "opacity-60" : ""}`}
                       >
                         <div
@@ -128,6 +143,16 @@ export default function SharedListClient({ items: initialItems, createdAt, expir
                             </svg>
                           )}
                         </div>
+
+                        {/* Thumbnail */}
+                        {item.image_url ? (
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-clay/30 flex-shrink-0">
+                            <Image src={item.image_url} alt={item.name} width={40} height={40} unoptimized className="w-full h-full object-contain p-0.5" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-clay/20 flex-shrink-0" />
+                        )}
+
                         <div className="flex-1 min-w-0">
                           <p className={`font-sans text-base ${isChecked ? "line-through text-forest/40" : "text-forest"}`}>
                             {item.name}
@@ -148,6 +173,20 @@ export default function SharedListClient({ items: initialItems, createdAt, expir
           );
         })}
       </div>
+
+      {/* Image preview overlay */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-8 z-50"
+          onPointerUp={() => setPreviewImage(null)}
+          onPointerLeave={() => setPreviewImage(null)}
+        >
+          <div className="absolute inset-0 bg-forest/60 backdrop-blur-sm" aria-hidden="true" />
+          <div className="relative max-w-sm w-full">
+            <Image src={previewImage} alt="Item preview" width={400} height={400} unoptimized className="w-full h-auto object-contain rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
     </>
   );
 }

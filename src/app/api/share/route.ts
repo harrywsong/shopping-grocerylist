@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
+import fs from "node:fs";
+import path from "node:path";
 import { ShoppingListItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +12,23 @@ interface ShareEntry {
   expires_at: number;
 }
 
-// In-memory store (module-level singleton for Next.js server)
-const shareStore = new Map<string, ShareEntry>();
+const DATA_DIR = path.join(process.cwd(), "data");
+const SHARE_FILE = path.join(DATA_DIR, "shares.json");
+
+function readStore(): Record<string, ShareEntry> {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(SHARE_FILE)) return {};
+    return JSON.parse(fs.readFileSync(SHARE_FILE, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeStore(store: Record<string, ShareEntry>): void {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(SHARE_FILE, JSON.stringify(store), "utf-8");
+}
 
 function generateId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -22,15 +39,13 @@ function generateId(): string {
   return result;
 }
 
-function cleanupExpired(): void {
+function cleanupExpired(store: Record<string, ShareEntry>): Record<string, ShareEntry> {
   const now = Date.now();
-  const keysToDelete: string[] = [];
-  shareStore.forEach((entry, key) => {
-    if (entry.expires_at < now) {
-      keysToDelete.push(key);
-    }
-  });
-  keysToDelete.forEach((key) => shareStore.delete(key));
+  const cleaned: Record<string, ShareEntry> = {};
+  for (const [key, entry] of Object.entries(store)) {
+    if (entry.expires_at >= now) cleaned[key] = entry;
+  }
+  return cleaned;
 }
 
 export async function POST(request: NextRequest) {
@@ -42,29 +57,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "items array is required and must not be empty" }, { status: 400 });
     }
 
-    cleanupExpired();
-
+    const store = cleanupExpired(readStore());
     const id = generateId();
     const now = Date.now();
     const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-    shareStore.set(id, {
-      items,
-      created_at: now,
-      expires_at: now + SIX_HOURS,
-    });
+    store[id] = { items, created_at: now, expires_at: now + SIX_HOURS };
+    writeStore(store);
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const shareUrl = `${baseUrl}/share/${id}`;
 
-    // Generate QR code as base64 data URL
     const qrDataUrl = await QRCode.toDataURL(shareUrl, {
       width: 256,
       margin: 2,
-      color: {
-        dark: "#2D3A31",
-        light: "#F9F8F4",
-      },
+      color: { dark: "#2D3A31", light: "#F9F8F4" },
     });
 
     return NextResponse.json({ id, url: shareUrl, qr: qrDataUrl }, { status: 201 });
@@ -82,9 +89,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
-  cleanupExpired();
+  const store = cleanupExpired(readStore());
+  const entry = store[id];
 
-  const entry = shareStore.get(id);
   if (!entry) {
     return NextResponse.json({ error: "Shared list not found or has expired" }, { status: 404 });
   }
