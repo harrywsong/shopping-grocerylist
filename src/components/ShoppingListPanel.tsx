@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { ShoppingListItem } from "@/lib/types";
 
@@ -32,6 +32,17 @@ export default function ShoppingListPanel({
   const [shareData, setShareData] = useState<{ url: string; qr: string } | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startPress = (imageUrl: string | null) => {
+    if (!imageUrl) return;
+    pressTimer.current = setTimeout(() => setPreviewImage(imageUrl), 400);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  };
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -133,6 +144,9 @@ export default function ShoppingListPanel({
                     <div
                       key={item.id}
                       className={`flex items-center gap-3 px-6 py-3 hover:bg-stone/30 transition-colors duration-200 group ${item.checked ? "opacity-60" : ""}`}
+                      onPointerDown={() => startPress(item.image_url)}
+                      onPointerUp={cancelPress}
+                      onPointerLeave={cancelPress}
                     >
                       {/* Checkbox */}
                       <button
@@ -247,6 +261,20 @@ export default function ShoppingListPanel({
           </div>
         )}
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-8 z-[70]"
+          onPointerUp={() => setPreviewImage(null)}
+          onPointerLeave={() => setPreviewImage(null)}
+        >
+          <div className="absolute inset-0 bg-forest/60 backdrop-blur-sm" aria-hidden="true" />
+          <div className="relative max-w-sm w-full">
+            <Image src={previewImage} alt="Item preview" width={400} height={400} unoptimized className="w-full h-auto object-contain rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
 
       {/* QR Modal */}
       {showQR && shareData && (
