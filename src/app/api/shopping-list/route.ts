@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       image_url: image_url ?? null,
       flyer_item_id: flyer_item_id ?? null,
       checked: false,
+      quantity: 1,
     });
 
     return NextResponse.json({ item }, { status: 201 });
