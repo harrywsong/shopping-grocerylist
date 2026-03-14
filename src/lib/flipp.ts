@@ -75,7 +75,7 @@ function parseSavingsFromSaleStory(
 }
 
 function toNumber(v: unknown): number | null {
-  if (v == null) return null;
+  if (v == null || v === "") return null;
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
 }
@@ -153,69 +153,46 @@ export async function searchItems(
   return rawItems.map(normalizeSearchItem);
 }
 
-async function fetchAndExtractItems(url: string): Promise<FlippSearchItem[]> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "Mozilla/5.0 (compatible; GroceryApp/1.0)",
-    },
-    next: { revalidate: 300 },
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Flipp API ${response.status}: ${body.slice(0, 120)}`);
-  }
-
-  const data = await response.json();
-
-  if (Array.isArray(data)) return data as FlippSearchItem[];
-  if (data && Array.isArray(data.items)) return data.items as FlippSearchItem[];
-
-  // Some flyer endpoints nest items under "promotions" or another key
-  if (data && typeof data === "object") {
-    for (const key of Object.keys(data)) {
-      if (Array.isArray(data[key]) && data[key].length > 0) {
-        return data[key] as FlippSearchItem[];
-      }
-    }
-  }
-  return [];
-}
 
 interface FlippFlyerItemRaw {
   id: number | string;
-  name: string;
+  name?: string | null;
+  description?: string | null;
   price?: string | number | null;
-  discount?: string | null;
+  current_price?: string | number | null;
+  pre_price_text?: string | null;
+  price_text?: string | null;
+  sale_story?: string | null;
+  discount?: string | number | null;
   cutout_image_url?: string | null;
+  clean_image_url?: string | null;
+  clipping_image_url?: string | null;
+  unit?: string | null;
   valid_from?: string | null;
   valid_to?: string | null;
   flyer_id?: number;
 }
 
 function normalizeFlyerItem(item: FlippFlyerItemRaw, merchantName: string): FlyerItem {
-  const price = toNumber(item.price);
-  const { original_price, savings_percentage } = parseSavingsFromSaleStory(
-    typeof item.discount === "string" ? item.discount : null,
-    price
-  );
-  const on_sale = !!(original_price || (item.discount && String(item.discount).trim().length > 0));
+  const price = toNumber(item.current_price) ?? toNumber(item.price);
+  const saleStory = item.sale_story || (typeof item.discount === "string" ? item.discount : null);
+  const { original_price, savings_percentage } = parseSavingsFromSaleStory(saleStory, price);
+  const on_sale = !!(original_price || (saleStory && saleStory.trim().length > 0));
 
   return {
     id: item.id,
-    name: item.name || "Unknown Item",
+    name: item.name || item.description || "Unknown Item",
     price,
     original_price,
-    unit: null,
-    image_url: item.cutout_image_url || null,
-    cutout_image_url: item.cutout_image_url || null,
+    unit: item.unit || null,
+    image_url: item.clean_image_url || item.cutout_image_url || item.clipping_image_url || null,
+    cutout_image_url: item.cutout_image_url || item.clipping_image_url || null,
     store_name: merchantName,
     on_sale,
     savings_percentage,
     valid_from: item.valid_from || null,
     valid_to: item.valid_to || null,
-    sale_story: typeof item.discount === "string" ? item.discount : null,
+    sale_story: saleStory,
   };
 }
 

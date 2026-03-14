@@ -23,17 +23,18 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, store_name, price, image_url } = body;
+    const { name, store_name, price, image_url, flyer_item_id } = body;
 
-    if (!name || !store_name) {
-      return NextResponse.json({ error: "name and store_name are required" }, { status: 400 });
+    if (!store_name) {
+      return NextResponse.json({ error: "store_name is required" }, { status: 400 });
     }
 
     const item = addToShoppingList({
-      name,
+      name: name || "Unknown Item",
       store_name,
       price: price ?? null,
       image_url: image_url ?? null,
+      flyer_item_id: flyer_item_id ?? null,
       checked: false,
     });
 

@@ -27,6 +27,7 @@ export interface StoreFlyer {
 
 export interface ShoppingListItem {
   id: string;
+  flyer_item_id?: string | number | null;
   name: string;
   store_name: string;
   price: number | null;

@@ -228,10 +228,13 @@ export default function Home() {
   };
 
   const handleAddToList = async (item: FlyerItem) => {
-    // Check if already in list
-    const alreadyIn = shoppingList.some(
-      (li) => String(li.name) === String(item.name) && li.store_name === item.store_name
-    );
+    // Check if already in list — use flyer item id for unnamed items to avoid false deduplication
+    const alreadyIn = shoppingList.some((li) => {
+      if (item.name && item.name !== "Unknown Item") {
+        return li.name === item.name && li.store_name === item.store_name;
+      }
+      return String(li.flyer_item_id) === String(item.id);
+    });
     if (alreadyIn) return;
 
     try {
@@ -243,6 +246,7 @@ export default function Home() {
           store_name: item.store_name,
           price: item.price,
           image_url: item.cutout_image_url || item.image_url,
+          flyer_item_id: item.id,
         }),
       });
       const data = await res.json();
@@ -254,8 +258,12 @@ export default function Home() {
     }
   };
 
-  const getListItem = (item: FlyerItem) =>
-    shoppingList.find((li) => li.name === item.name && li.store_name === item.store_name);
+  const getListItem = (item: FlyerItem) => {
+    if (item.name && item.name !== "Unknown Item") {
+      return shoppingList.find((li) => li.name === item.name && li.store_name === item.store_name);
+    }
+    return shoppingList.find((li) => String(li.flyer_item_id) === String(item.id));
+  };
 
   const handleQuantityChangeById = async (id: string, delta: number) => {
     const listItem = shoppingList.find((li) => li.id === id);
@@ -382,9 +390,10 @@ export default function Home() {
   };
 
   const isInList = (item: FlyerItem): boolean => {
-    return shoppingList.some(
-      (li) => li.name === item.name && li.store_name === item.store_name
-    );
+    if (item.name && item.name !== "Unknown Item") {
+      return shoppingList.some((li) => li.name === item.name && li.store_name === item.store_name);
+    }
+    return shoppingList.some((li) => String(li.flyer_item_id) === String(item.id));
   };
 
   // Get unique stores from current items
