@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       expires_at: now + SIX_HOURS,
     });
 
-    const baseUrl = request.nextUrl.origin;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const shareUrl = `${baseUrl}/share/${id}`;
 
     // Generate QR code as base64 data URL
