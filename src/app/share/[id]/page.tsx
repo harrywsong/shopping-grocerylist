@@ -33,7 +33,7 @@ async function getSharedList(id: string, baseUrl: string): Promise<{
 export default async function SharePage({ params }: PageProps) {
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://40.233.95.61:3000");
 
   const data = await getSharedList(params.id, baseUrl);
 
